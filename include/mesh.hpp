@@ -14,7 +14,6 @@ struct MyUsedTypes : public vcg::UsedTypes< vcg::Use<MyVertex>::AsVertexType,
 class MyVertex : public vcg::Vertex< MyUsedTypes,
                                      vcg::vertex::Coord3d,
                                      vcg::vertex::VFAdj,
-                                     vcg::vertex::Qualityd,
                                      vcg::vertex::BitFlags >{};
 
 class MyFace : public vcg::Face< MyUsedTypes,
