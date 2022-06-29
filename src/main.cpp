@@ -1,42 +1,56 @@
 #include <iostream>
 
-#include <vcg/complex/algorithms/create/platonic.h>
-#include <vcg/complex/algorithms/update/color.h>
-#include <vcg/space/color4.h>
+#include <vcg/complex/algorithms/mesh_to_matrix.h>
+
 #include <wrap/io_trimesh/io_mask.h>
 #include <wrap/io_trimesh/import_obj.h>
 #include <wrap/io_trimesh/export_obj.h>
 #include <wrap/io_trimesh/export_ply.h>
+template<class M> using ImporterOBJ = vcg::tri::io::ImporterOBJ<M>;
+template<class M> using ExporterPLY = vcg::tri::io::ExporterPLY<M>;
+using TriMask = vcg::tri::io::Mask;
 
 #include "mesh.hpp"
 
 
-double regionNormalDeviation(std::vector<vcg::face::Pos<MyFace>> star, int regionBeginIndex, int regionSize)
+struct PartitionedVertexStar
+{
+    std::vector<size_t> starI;   // star of face indices
+    int rBegin;                  // index of the starting face within starI for the first region
+    int rSize;                   // cardinality of the first region
+};
+
+
+double regionNormalDeviation(const Eigen::MatrixXd& normals,
+                             std::vector<size_t> starI,
+                             int regionBeginIndex,
+                             int regionSize)
 {   
-    vcg::Point3d n;
-    n.SetZero();
+    Eigen::RowVector3d n = Eigen::Array3d::Zero();
 
-    for(int i = regionBeginIndex; i < (regionBeginIndex+regionSize-1); i++)
-        for(int j = i+1; j < (regionBeginIndex+regionSize); j++)
-            n += (star[i%star.size()].F()->N() - star[j%star.size()].F()->N()); // TODO migliorare
+    for(int i = regionBeginIndex; i < (regionBeginIndex + regionSize - 1); i++)
+        for(int j = i+1; j < (regionBeginIndex + regionSize); j++)
+            n += (normals.row(starI[i%starI.size()]) - normals.row(starI[j%starI.size()]));
 
-    return n.SquaredNorm() / std::pow(regionSize, 2);
+    return n.squaredNorm() / std::pow(regionSize, 2);
 }
 
 
-double localCombinatorialEnergy(MyVertex* v)
-{
+double localCombinatorialEnergy(MyMesh& mesh,
+                                size_t v,
+                                const Eigen::MatrixX3d& N,
+                                PartitionedVertexStar* partitioning = nullptr)
+{ 
+    MyMesh::VertexPointer vPointer = &mesh.vert[v];
     std::vector<vcg::face::Pos<MyFace>> star;
-    vcg::face::VFOrderedStarFF(vcg::face::Pos<MyFace>(v->VFp(), v), star);
+    std::vector<size_t> starI;
+    vcg::face::VFOrderedStarFF(vcg::face::Pos<MyFace>(vPointer->VFp(), vPointer), star);
+    for(vcg::face::Pos<MyFace> p : star)
+        starI.push_back(vcg::tri::Index(mesh, p.F()));
         
-    // TODO: ritoccare gestione casi speciali |VF|=3 e |VF|<2
     double energy = -1.0;
 
-    if(star.size() == 2)
-    {
-        energy = 0.0;
-    }
-    else if(star.size() > 3)
+    if(star.size() > 3)
     {
         // consider all possible cardinalities of a region resulting from a partitioning of the star
         for(int rSize = 2; rSize <= (star.size()-2); rSize++)
@@ -45,18 +59,54 @@ double localCombinatorialEnergy(MyVertex* v)
             // rBegin is the index of the first face in the region
             for(int rBegin = 0; rBegin < (star.size()-rSize); rBegin++)
             {
-                double currRegionEnergy =  regionNormalDeviation(star, rBegin,       rSize);
-                double otherRegionEnergy = regionNormalDeviation(star, rBegin+rSize, star.size()-rSize);
+                double currRegionEnergy =  regionNormalDeviation(N, starI, rBegin,       rSize);
+                double otherRegionEnergy = regionNormalDeviation(N, starI, rBegin+rSize, star.size()-rSize);
                 
                 double currPartitioningEnergy = currRegionEnergy + otherRegionEnergy;
 
                 if(energy < 0 || currPartitioningEnergy < energy)
+                {
                     energy = currPartitioningEnergy;
+                    if(partitioning != nullptr)
+                    {
+                        partitioning->starI = starI;
+                        partitioning->rBegin = rBegin;
+                        partitioning->rSize = rSize;
+                    }
+                }
             }
         }
     }
+    else if(star.size() == 2)
+    {
+        energy = 0.0;
+        if(partitioning != nullptr)
+        {
+            partitioning->starI = starI;
+            partitioning->rBegin = 0;
+            partitioning->rSize = 1;
+        }
+    }
+    else return -1.0;
 
     return energy;
+}
+
+
+void computeNormals(const Eigen::MatrixXd& vert,
+                    const Eigen::MatrixXi& faces,
+                    Eigen::MatrixXd& normals,
+                    Eigen::ArrayXd& areas)
+{
+    for(size_t fIndex = 0; fIndex < normals.rows(); fIndex++)
+    {
+        Eigen::Vector3d edgeAvec = vert.row(faces(fIndex, 1)) - vert.row(faces(fIndex, 0));
+        Eigen::Vector3d edgeBvec = vert.row(faces(fIndex, 2)) - vert.row(faces(fIndex, 0));
+
+        normals.row(fIndex) = edgeAvec.cross(edgeBvec);
+        areas(fIndex) = normals.row(fIndex).norm() / 2.0;
+        normals.row(fIndex).normalize();
+    }
 }
 
 
@@ -64,16 +114,18 @@ int main(int argc, char* argv[])
 {
     if(argc < 2)
     {
-        std::cout << "No input file provided" << std::endl;
+        std::cout << "Missing args" << std::endl;
         return 1;
     }
     
     MyMesh m;
-
-    //vcg::tri::Hexahedron(m);
+    Eigen::MatrixXd V;
+    Eigen::MatrixXi F;
+    Eigen::MatrixXd N;
+    Eigen::ArrayXd  A;
 
     int loadMask;
-    if(vcg::tri::io::ImporterOBJ<MyMesh>::Open(m, argv[1], loadMask) != vcg::tri::io::ImporterOBJ<MyMesh>::E_NOERROR)
+    if(ImporterOBJ<MyMesh>::Open(m, argv[1], loadMask) != ImporterOBJ<MyMesh>::E_NOERROR)
     {
         std::cout << "Error reading input file" << std::endl;
         return 1;
@@ -84,14 +136,17 @@ int main(int argc, char* argv[])
     vcg::tri::UpdateTopology<MyMesh>::VertexFace(m);
     vcg::tri::RequireFFAdjacency(m);
     vcg::tri::UpdateTopology<MyMesh>::FaceFace(m);
-    
-    vcg::tri::RequirePerFaceNormal(m);
-    vcg::tri::UpdateNormal<MyMesh>::PerFaceNormalized(m);
+        
+    vcg::tri::MeshToMatrix<MyMesh>::GetTriMeshData(m, F, V);
+    N = Eigen::MatrixXd(m.FN(), 3);
+    A = Eigen::ArrayXd(m.FN());
 
-    for(MyMesh::VertexIterator vIter = m.vert.begin(); vIter != m.vert.end(); vIter++)
-        (*vIter).Q() = localCombinatorialEnergy(&*vIter);
+    computeNormals(V, F, N, A);
 
-    vcg::tri::io::ExporterPLY<MyMesh>::Save(m, "out.ply", vcg::tri::io::Mask::IOM_VERTQUALITY, false);
+    double totEnergy = 0.0;
+    for(size_t v = 0; v < V.rows(); v++)
+        totEnergy += localCombinatorialEnergy(m, v, N);
+    std::cout << "Total energy = " << totEnergy << std::endl;
 
     return 0;
 }
