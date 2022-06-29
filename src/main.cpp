@@ -93,6 +93,67 @@ double localCombinatorialEnergy(MyMesh& mesh,
 }
 
 
+void combinatorialEnergyGrad(MyMesh& mesh,
+                             const Eigen::MatrixX3d& V,
+                             const Eigen::MatrixX3i& F,
+                             const Eigen::MatrixX3d& N,
+                             const Eigen::ArrayXd& A,
+                             Eigen::MatrixXd& energyGrad,
+                             std::function<void(double, size_t)> localEnergyCallback)
+{
+    auto faceNormalGrad = [&](size_t fIndex, int v) -> Eigen::Matrix3d {
+        Eigen::Vector3d oppositeEdge = V.row(F(fIndex, (v+1)%3)) - V.row(F(fIndex, (v+2)%3));
+        Eigen::Vector3d normal = N.row(fIndex);
+        return (oppositeEdge.cross(V.row(fIndex)) * normal.transpose()) / A(fIndex);
+    };
+
+    int faceA, faceB, vFaceIndex;
+    Eigen::Vector3d normalDiff;
+
+    auto regionNormalDeviationGrad = [&](int v, const PartitionedVertexStar& region) {        
+        for(int i = region.rBegin; i < (region.rBegin + region.rSize - 1); i++)
+            for(int j = i+1; j < (region.rBegin + region.rSize); j++)
+            {
+                faceA = region.starI[i % region.starI.size()];
+                faceB = region.starI[j % region.starI.size()];
+                normalDiff = N.row(faceA) - N.row(faceB);
+
+                for(vFaceIndex = 0; vFaceIndex < 3; vFaceIndex++)
+                {
+                    if(F(faceA, vFaceIndex) == v) continue;
+                    energyGrad.row(v) += (faceNormalGrad(faceA, vFaceIndex).transpose() * normalDiff * 2);
+                }
+
+                for(vFaceIndex = 0; vFaceIndex < 3; vFaceIndex++)
+                {
+                    if(F(faceB, vFaceIndex) == v) continue;
+                    energyGrad.row(v) += (faceNormalGrad(faceB, vFaceIndex).transpose() * normalDiff * 2);
+                }
+
+                energyGrad.row(v) += ((faceNormalGrad(faceA, vFaceIndex) - faceNormalGrad(faceB, vFaceIndex)).transpose() * normalDiff * 2);
+            }
+    };
+
+    PartitionedVertexStar currPart;
+    double currEnergy;
+    energyGrad.setZero(energyGrad.rows(), energyGrad.cols());
+
+    for(size_t v = 0; v < V.rows(); v++)
+    {
+        currEnergy = localCombinatorialEnergy(mesh, v, N, &currPart);
+        localEnergyCallback(currEnergy, v);
+
+        if(currPart.starI.size() == 3)
+            continue;
+        
+        regionNormalDeviationGrad(v, currPart);
+        currPart.rBegin = (currPart.rBegin + currPart.rSize) % currPart.starI.size();
+        currPart.rSize  = currPart.starI.size() - currPart.rSize;
+        regionNormalDeviationGrad(v, currPart);        
+    }
+}
+
+
 void computeNormals(const Eigen::MatrixXd& vert,
                     const Eigen::MatrixXi& faces,
                     Eigen::MatrixXd& normals,
@@ -112,7 +173,7 @@ void computeNormals(const Eigen::MatrixXd& vert,
 
 int main(int argc, char* argv[])
 {
-    if(argc < 2)
+    if(argc < 4)
     {
         std::cout << "Missing args" << std::endl;
         return 1;
@@ -123,6 +184,7 @@ int main(int argc, char* argv[])
     Eigen::MatrixXi F;
     Eigen::MatrixXd N;
     Eigen::ArrayXd  A;
+    Eigen::MatrixXd gradient;
 
     int loadMask;
     if(ImporterOBJ<MyMesh>::Open(m, argv[1], loadMask) != ImporterOBJ<MyMesh>::E_NOERROR)
@@ -140,13 +202,31 @@ int main(int argc, char* argv[])
     vcg::tri::MeshToMatrix<MyMesh>::GetTriMeshData(m, F, V);
     N = Eigen::MatrixXd(m.FN(), 3);
     A = Eigen::ArrayXd(m.FN());
+    gradient = Eigen::MatrixXd(V.rows(), 3);    
 
-    computeNormals(V, F, N, A);
+    // perform standard gradient descent with argv[2] steps and a stepsize of argv[3]
+    int nSteps = atoi(argv[2]);
+    float stepSize = atof(argv[3]);
+    double totEnergy;
+    for(int step = 0; step < nSteps; step++)
+    {
+        computeNormals(V, F, N, A);
+        gradient.setZero();
+        totEnergy = 0.0;
 
-    double totEnergy = 0.0;
+        combinatorialEnergyGrad(m, V, F, N, A, gradient, [&totEnergy](double localEnergy, size_t v) {
+            totEnergy += localEnergy;
+        });
+
+        std::cout << "Step #" << step << "\tEnergy=" << totEnergy << std::endl;
+
+        V += (gradient * stepSize);
+    }
+
     for(size_t v = 0; v < V.rows(); v++)
-        totEnergy += localCombinatorialEnergy(m, v, N);
-    std::cout << "Total energy = " << totEnergy << std::endl;
+        m.vert[v].P() = vcg::Point3d(V(v, 0), V(v, 1), V(v, 2));
+
+    vcg::tri::io::ExporterPLY<MyMesh>::Save(m, "out.ply", TriMask::IOM_NONE, false);
 
     return 0;
 }
