@@ -98,7 +98,9 @@ void combinatorialEnergyGrad(MyMesh& mesh,
 
     MyMesh::FacePointer faceA, faceB;
     vcg::Point3d faceNormDiff;
-    int vIndex;
+    int faceAvIndex, faceBvIndex;
+    MyVertex *faceAv, *faceBv;
+    bool sharedVertex;
 
     // set to zero the area of each face
     for(MyMesh::FaceIterator fIter = mesh.face.begin(); fIter != mesh.face.end(); fIter++)
@@ -130,18 +132,45 @@ void combinatorialEnergyGrad(MyMesh& mesh,
 
                 faceNormDiff = faceA->N() - faceB->N();
 
-                for(vIndex = 0; vIndex < 3; vIndex++)
+                for(faceAvIndex = 0; faceAvIndex < 3; faceAvIndex++)
                 {
-                    if(faceA->V(vIndex) == v)
-                        energyGrad[v] += ((faceNormalGrad(faceA, vIndex) - faceNormalGrad(faceB, vIndex)).transpose() * faceNormDiff * 2);
-                    else
-                        energyGrad[v] += (faceNormalGrad(faceA, vIndex).transpose() * faceNormDiff * 2);
+                    faceAv = faceA->V(faceAvIndex);
+                    
+                    // check if the current vertex of faceA is shared with faceB
+                    sharedVertex = false;
+                    for(faceBvIndex = 0; faceBvIndex < 3; faceBvIndex++)
+                    {
+                        faceBv = faceB->V(faceBvIndex);
+                        if(faceAv == faceBv)
+                        {
+                            energyGrad[v] += ((faceNormalGrad(faceA, faceAvIndex) - faceNormalGrad(faceB, faceBvIndex)).transpose() * faceNormDiff * 2);
+                            sharedVertex = true;
+                            break;
+                        }
+                    }
+
+                    if(!sharedVertex)
+                        energyGrad[v] += (faceNormalGrad(faceA, faceAvIndex).transpose() * faceNormDiff * 2);
                 }
 
-                for(vIndex = 0; vIndex < 3; vIndex++)
+                for(faceBvIndex = 0; faceBvIndex < 3; faceBvIndex++)
                 {
-                    if(faceB->V(vIndex) != v)
-                        energyGrad[v] += (faceNormalGrad(faceB, vIndex).transpose() * faceNormDiff * 2);
+                    faceBv = faceB->V(faceBvIndex);
+
+                    // make sure the current vertex of faceB is not shared with faceA
+                    sharedVertex = false;
+                    for(faceAvIndex = 0; faceAvIndex < 3; faceAvIndex++)
+                    {
+                        faceAv = faceA->V(faceAvIndex);
+                        if(faceAv == faceBv)
+                        {
+                            sharedVertex = true;
+                            break;
+                        }
+                    }
+
+                    if(!sharedVertex)
+                        energyGrad[v] += (faceNormalGrad(faceB, faceBvIndex).transpose() * faceNormDiff * 2);
                 }
             }
     };
