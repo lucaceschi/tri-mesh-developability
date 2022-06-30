@@ -104,33 +104,65 @@ void combinatorialEnergyGrad(MyMesh& mesh,
     auto faceNormalGrad = [&](size_t fIndex, int v) -> Eigen::Matrix3d {
         Eigen::Vector3d oppositeEdge = V.row(F(fIndex, (v+1)%3)) - V.row(F(fIndex, (v+2)%3));
         Eigen::Vector3d normal = N.row(fIndex);
-        return (oppositeEdge.cross(V.row(fIndex)) * normal.transpose()) / A(fIndex);
+        Eigen::Matrix3d grad = (oppositeEdge.cross(normal) * normal.transpose());
+
+        return grad / A(fIndex);
     };
 
-    int faceA, faceB, vFaceIndex;
+    int faceA, faceB;
+    int vertexA, vertexB, vertexAfaceIndex, vertexBfaceIndex;
+    int i, j;
+    bool sharedVertex;
     Eigen::Vector3d normalDiff;
 
     auto regionNormalDeviationGrad = [&](int v, const PartitionedVertexStar& region) {        
-        for(int i = region.rBegin; i < (region.rBegin + region.rSize - 1); i++)
-            for(int j = i+1; j < (region.rBegin + region.rSize); j++)
+        for(i = region.rBegin; i < (region.rBegin + region.rSize - 1); i++)
+            for(j = i+1; j < (region.rBegin + region.rSize); j++)
             {
                 faceA = region.starI[i % region.starI.size()];
                 faceB = region.starI[j % region.starI.size()];
                 normalDiff = N.row(faceA) - N.row(faceB);
 
-                for(vFaceIndex = 0; vFaceIndex < 3; vFaceIndex++)
+                for(vertexAfaceIndex = 0; vertexAfaceIndex < 3; vertexAfaceIndex++)
                 {
-                    if(F(faceA, vFaceIndex) == v) continue;
-                    energyGrad.row(v) += (faceNormalGrad(faceA, vFaceIndex).transpose() * normalDiff * 2);
+                    vertexA = F(faceA, vertexAfaceIndex);
+                    
+                    // check if the current vertex of faceA is shared with faceB
+                    sharedVertex = false;
+                    for(vertexBfaceIndex = 0; vertexBfaceIndex < 3; vertexBfaceIndex++)
+                    {
+                        vertexB = F(faceB, vertexBfaceIndex);
+                        if(vertexA == vertexB)
+                        {
+                            energyGrad.row(v) += ((faceNormalGrad(faceA, vertexAfaceIndex) - faceNormalGrad(faceB, vertexBfaceIndex)).transpose() * normalDiff * 2);
+                            sharedVertex = true;
+                            break;
+                        }
+                    }
+
+                    if(!sharedVertex)
+                        energyGrad.row(v) += (faceNormalGrad(faceA, vertexAfaceIndex).transpose() * normalDiff * 2);
                 }
 
-                for(vFaceIndex = 0; vFaceIndex < 3; vFaceIndex++)
+                for(vertexBfaceIndex = 0; vertexBfaceIndex < 3; vertexBfaceIndex++)
                 {
-                    if(F(faceB, vFaceIndex) == v) continue;
-                    energyGrad.row(v) += (faceNormalGrad(faceB, vFaceIndex).transpose() * normalDiff * 2);
-                }
+                    vertexB = F(faceB, vertexBfaceIndex);
 
-                energyGrad.row(v) += ((faceNormalGrad(faceA, vFaceIndex) - faceNormalGrad(faceB, vFaceIndex)).transpose() * normalDiff * 2);
+                    // make sure the current vertex of faceB is not shared with faceA
+                    sharedVertex = false;
+                    for(vertexAfaceIndex = 0; vertexAfaceIndex < 3; vertexAfaceIndex++)
+                    {
+                        vertexA = F(faceA, vertexAfaceIndex);
+                        if(vertexA == vertexB)
+                        {
+                            sharedVertex = true;
+                            break;
+                        }
+                    }
+
+                    if(!sharedVertex)
+                        energyGrad.row(v) += (faceNormalGrad(faceB, vertexBfaceIndex).transpose() * normalDiff * 2);
+                }
             }
     };
 
@@ -147,9 +179,11 @@ void combinatorialEnergyGrad(MyMesh& mesh,
             continue;
         
         regionNormalDeviationGrad(v, currPart);
-        currPart.rBegin = (currPart.rBegin + currPart.rSize) % currPart.starI.size();
+        currPart.rBegin = (currPart.rBegin + currPart.rSize); // % currPart.starI.size();
         currPart.rSize  = currPart.starI.size() - currPart.rSize;
-        regionNormalDeviationGrad(v, currPart);        
+        regionNormalDeviationGrad(v, currPart);
+
+        energyGrad.row(v) /= std::pow(currPart.starI.size(), 2);
     }
 }
 
@@ -159,14 +193,19 @@ void computeNormals(const Eigen::MatrixXd& vert,
                     Eigen::MatrixXd& normals,
                     Eigen::ArrayXd& areas)
 {
+    Eigen::Vector3d edgeAvec, edgeBvec;
+    double norm;
+    
     for(size_t fIndex = 0; fIndex < normals.rows(); fIndex++)
     {
-        Eigen::Vector3d edgeAvec = vert.row(faces(fIndex, 1)) - vert.row(faces(fIndex, 0));
-        Eigen::Vector3d edgeBvec = vert.row(faces(fIndex, 2)) - vert.row(faces(fIndex, 0));
+        edgeAvec = vert.row(faces(fIndex, 1)) - vert.row(faces(fIndex, 0));
+        edgeBvec = vert.row(faces(fIndex, 2)) - vert.row(faces(fIndex, 0));
 
         normals.row(fIndex) = edgeAvec.cross(edgeBvec);
-        areas(fIndex) = normals.row(fIndex).norm() / 2.0;
-        normals.row(fIndex).normalize();
+        norm = normals.row(fIndex).norm();
+        areas(fIndex) = norm / 2.0;
+        assert(norm > 0); // the two edges cannot be parallel
+        normals.row(fIndex) /= norm;
     }
 }
 
