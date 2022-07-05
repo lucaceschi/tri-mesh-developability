@@ -9,7 +9,11 @@ set(SRC_DIR src)
 set(INCL_DIR include)
 set(SOURCES
 	${SRC_DIR}/main.cpp
+	${SRC_DIR}/energy.cpp
+	${SRC_DIR}/energy_grad.cpp
 	${INCL_DIR}/mesh.hpp
+	${INCL_DIR}/energy.hpp
+	${INCL_DIR}/energy_grad.hpp
 	${VCGLIB_DIR}/wrap/ply/plylib.cpp
 )
 
