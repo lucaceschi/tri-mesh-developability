@@ -9,7 +9,13 @@ set(SRC_DIR src)
 set(INCL_DIR include)
 set(SOURCES
 	${SRC_DIR}/main.cpp
+	${SRC_DIR}/mesh_matrix.cpp
+	${SRC_DIR}/energy.cpp
+	${SRC_DIR}/energy_grad.cpp
 	${INCL_DIR}/mesh.hpp
+	${INCL_DIR}/mesh_matrix.hpp
+	${INCL_DIR}/energy.hpp
+	${INCL_DIR}/energy_grad.hpp
 	${VCGLIB_DIR}/wrap/ply/plylib.cpp
 )
 
@@ -20,3 +26,8 @@ target_include_directories(out PRIVATE ${INCL_DIR})
 target_link_libraries(out
 	PUBLIC vcglib
 )
+
+find_package(OpenMP)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(out PUBLIC OpenMP::OpenMP_CXX)
+endif()
