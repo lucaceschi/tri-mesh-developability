@@ -17,6 +17,8 @@ using TriMask = vcg::tri::io::Mask;
 
 #include <time.h>
 
+#define MIN_ANGLE 0.4
+
 
 // -------------------------------------------------------------------------------------------------
 // MAIN
@@ -57,7 +59,7 @@ int main(int argc, char* argv[])
     getMeshStars(m, S);
     getMeshBorders(m, B);
 
-   // >> Gradient <<
+    // >> Gradient descent with mesh post processing<<
 
     Matrix3Xd G(V.rows(), 3);
 
@@ -68,6 +70,11 @@ int main(int argc, char* argv[])
     double dt;
     std::vector<double> dts;
     clock_t clockStart;
+
+    MyMesh::FaceIterator fIter;
+    double Ai, Aj, Ak;
+    int edgeToFlip;
+    bool edgeFlipped;
 
     for(int step = 0; step < nSteps; step++)
     {
@@ -80,6 +87,42 @@ int main(int argc, char* argv[])
         });
 
         V -= (G * stepSize);
+
+        for(size_t v = 0; v < V.rows(); v++)
+            m.vert[v].P() = vcg::Point3d(V(v, 0), V(v, 1), V(v, 2));
+        
+        edgeFlipped = false;
+        for(fIter = m.face.begin(); fIter != m.face.end(); fIter++)
+        {
+            Ai = vcg::face::WedgeAngleRad<MyFace>(*fIter, 0);
+            Aj = vcg::face::WedgeAngleRad<MyFace>(*fIter, 1);
+            Ak = vcg::face::WedgeAngleRad<MyFace>(*fIter, 2);
+
+            edgeToFlip = -1;
+            if(Ai + Aj < MIN_ANGLE)
+                edgeToFlip = 0;
+            else if(Aj + Ak < MIN_ANGLE)
+                edgeToFlip = 1;
+            else if(Ak + Ai < MIN_ANGLE)
+                edgeToFlip = 2;
+
+            if(edgeToFlip >= 0 && vcg::face::CheckFlipEdge(*fIter, edgeToFlip))
+            {
+                vcg::face::FlipEdge<MyFace>(*fIter, edgeToFlip);
+                edgeFlipped = true;
+            }
+        }
+
+        if(edgeFlipped)
+        {
+            std::cout << "Mesh topology has been altered" << std::endl;
+            vcg::tri::UpdateTopology<MyMesh>::VertexFace(m);
+            vcg::tri::UpdateTopology<MyMesh>::FaceFace(m);
+            vcg::tri::UpdateFlags<MyMesh>::VertexBorderFromFaceAdj(m);
+            getMeshVF(m, V, F);
+            getMeshStars(m, S);
+            getMeshBorders(m, B);
+        }
 
         dt = ((double)(clock() - clockStart) / CLOCKS_PER_SEC);
         std::cout << "[MAT] step #" << step << ": Energy=" << totEnergy << "\tTime=" << dt << std::endl;
