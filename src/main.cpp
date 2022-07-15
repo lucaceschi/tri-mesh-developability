@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 
 #include <vcg/complex/algorithms/mesh_to_matrix.h>
 
@@ -14,6 +15,7 @@ using TriMask = vcg::tri::io::Mask;
 #include "mesh_matrix.hpp"
 #include "energy.hpp"
 #include "energy_grad.hpp"
+#include "opt.hpp"
 
 #include <time.h>
 
@@ -57,40 +59,55 @@ int main(int argc, char* argv[])
     getMeshStars(m, S);
     getMeshBorders(m, B);
 
-   // >> Gradient <<
+    // >> Optimization <<
 
-    Matrix3Xd G(V.rows(), 3);
-
-    int nSteps = atoi(argv[2]);
-    float stepSize = atof(argv[3]);
-    double totEnergy;
-
+    // profiling
     double dt;
     std::vector<double> dts;
     clock_t clockStart;
 
-    for(int step = 0; step < nSteps; step++)
+    Optimizer* opt;
+
+    if(argv[2][0] == 'f')
     {
-        clockStart = clock();
-        computeNormals(V, F, N, A);
-        totEnergy = 0.0;
+        int maxFunEval = atoi(argv[3]);
+        double eps = atof(argv[4]);
+        double stepSize = atof(argv[5]);
 
-        combinatorialEnergyGrad(V, F, N, A, S, B, G, [&totEnergy](double localEnergy, size_t v) {
-            totEnergy += localEnergy;
-        });
-
-        V -= (G * stepSize);
-
-        dt = ((double)(clock() - clockStart) / CLOCKS_PER_SEC);
-        std::cout << "[MAT] step #" << step << ": Energy=" << totEnergy << "\tTime=" << dt << std::endl;
-        dts.push_back(dt);
+        opt = new FixedStepOpt(V.rows(), maxFunEval, eps, stepSize);
+    }
+    else if(argv[2][0] == 'b')
+    {
+        int maxFunEval = atoi(argv[3]);
+        double eps = atof(argv[4]);
+        
+        opt = new BacktrackingOpt(V.rows(), maxFunEval, eps);
+    }
+    else
+    {
+        int maxFunEval = atoi(argv[3]);
+        double eps = atof(argv[4]);
+        
+        opt = new LewisOvertonOpt(V.rows(), maxFunEval, eps);
     }
 
+    clockStart = clock();
+    while(opt->step(V, F, N, A, S, B))
+    {
+        dt = ((double)(clock() - clockStart) / CLOCKS_PER_SEC);
+        dts.push_back(dt);
+        opt->printStats();
+        clockStart = clock();
+    }
+
+    delete opt;
+
+    // compute mean dt
     dt = 0;
     for(double currDt : dts)
         dt += currDt;
     dt /= dts.size();
-    std::cout << dt << std::endl;
+    std::cout << "Mean dt: " << dt << std::endl;
 
     for(size_t v = 0; v < V.rows(); v++)
         m.vert[v].P() = vcg::Point3d(V(v, 0), V(v, 1), V(v, 2));

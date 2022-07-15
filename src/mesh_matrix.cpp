@@ -3,32 +3,20 @@
 #include <limits>
 
 
-template <typename DerivedV, typename DerivedF>
 void getMeshVF(const MyMesh& mesh,
-                    Eigen::MatrixBase<DerivedV> const& V_,
-                    Eigen::MatrixBase<DerivedF> const& F_)
-{    
-    Eigen::MatrixBase<DerivedV>& V = const_cast< Eigen::MatrixBase<DerivedV>& >(V_);
-    Eigen::MatrixBase<DerivedF>& F = const_cast< Eigen::MatrixBase<DerivedF>& >(F_);
-    
+               Eigen::Ref<Matrix3Xd> V,
+               Eigen::Ref<Matrix3Xi> F)
+{       
     vcg::tri::RequireCompactness(mesh);
 
-    V.derived().resize(mesh.VN(), 3);
     for(size_t i = 0; i < mesh.VN(); i++)
         for(size_t j = 0; j < 3; j++)
             V(i,j) = mesh.vert[i].cP()[j];
 
-    F.derived().resize(mesh.FN(), 3);
     for(size_t i = 0; i < mesh.FN(); i++)
         for(size_t j = 0; j < 3; j++)
             F(i,j) = (size_t) vcg::tri::Index(mesh, mesh.face[i].cV(j));
 }
-
-template void getMeshVF<Matrix3Xd, Matrix3Xi>(
-    const MyMesh& mesh,
-    Eigen::MatrixBase<Matrix3Xd> const& V_,
-    Eigen::MatrixBase<Matrix3Xi> const& F_
-);
 
 
 template <typename DerivedS>
@@ -68,38 +56,22 @@ template void getMeshStars<MatrixXi>(
 );
 
 
-template <typename DerivedB>
 void getMeshBorders(MyMesh& mesh,
-                    Eigen::ArrayBase<DerivedB> const& B_)
+                    Eigen::Ref<ArrayXb> B)
 {
-    Eigen::ArrayBase<DerivedB>&  B = const_cast< Eigen::ArrayBase<DerivedB>& >(B_);
-
-    B.derived().resize(mesh.VN(), Eigen::NoChange);
     for(size_t vIndex = 0; vIndex < B.rows(); vIndex++)
         B(vIndex) = mesh.vert[vIndex].IsB();
 }
 
-template void getMeshBorders<ArrayXb>(
-    MyMesh& mesh,
-    Eigen::ArrayBase<ArrayXb> const& B_
-);
 
-
-template <typename DerivedN, typename DerivedA>
 void computeNormals(const Eigen::Ref<const Matrix3Xd>& V,
                     const Eigen::Ref<const Matrix3Xi>& F,
-                    Eigen::MatrixBase<DerivedN> const& N_,
-                    Eigen::ArrayBase<DerivedA> const& A_)
-{
-    typedef typename DerivedA::Scalar AScalar;
-    Eigen::MatrixBase<DerivedN>& N = const_cast< Eigen::MatrixBase<DerivedN>& >(N_);
-    Eigen::ArrayBase<DerivedA>&  A = const_cast< Eigen::ArrayBase<DerivedA>&  >(A_);
-    
+                    Eigen::Ref<Matrix3Xd> N,
+                    Eigen::Ref<ArrayXd> A)
+{    
     Eigen::RowVector3d edgeAvec, edgeBvec;
-    AScalar norm;
+    double norm;
     
-    N.derived().resize(F.rows(), Eigen::NoChange);
-    A.derived().resize(F.rows());
     for(size_t fIndex = 0; fIndex < F.rows(); fIndex++)
     {
         edgeAvec = V.row(F(fIndex, 1)) - V.row(F(fIndex, 0));
@@ -112,10 +84,3 @@ void computeNormals(const Eigen::Ref<const Matrix3Xd>& V,
         N.row(fIndex) /= norm;
     }
 }
-
-template void computeNormals<Matrix3Xd, ArrayXd>(
-    const Eigen::Ref<const Matrix3Xd>& V,
-    const Eigen::Ref<const Matrix3Xi>& F,
-    Eigen::MatrixBase<Matrix3Xd> const& N_,
-    Eigen::ArrayBase<ArrayXd> const& A_
-);

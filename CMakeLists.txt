@@ -12,10 +12,12 @@ set(SOURCES
 	${SRC_DIR}/mesh_matrix.cpp
 	${SRC_DIR}/energy.cpp
 	${SRC_DIR}/energy_grad.cpp
+	${SRC_DIR}/opt.cpp
 	${INCL_DIR}/mesh.hpp
 	${INCL_DIR}/mesh_matrix.hpp
 	${INCL_DIR}/energy.hpp
 	${INCL_DIR}/energy_grad.hpp
+	${INCL_DIR}/opt.hpp
 	${VCGLIB_DIR}/wrap/ply/plylib.cpp
 )
 
