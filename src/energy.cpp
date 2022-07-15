@@ -3,6 +3,19 @@
 #include "mesh_matrix.hpp"
 
 
+double combinatorialEnergy(const Eigen::Ref<const Matrix3Xd>& N,
+                           const Eigen::Ref<const MatrixXi>& S,
+                           const Eigen::Ref<const ArrayXb>& B)
+{
+    double totEnergy = 0.0;
+
+    for(size_t v = 0; v < S.rows(); v++)
+        totEnergy += localCombinatorialEnergy(v, N, S, B);
+
+    return totEnergy;
+}
+
+
 double localCombinatorialEnergy(size_t v,
                                 const Eigen::Ref<const Matrix3Xd>& N,
                                 const Eigen::Ref<const MatrixXi>& S,

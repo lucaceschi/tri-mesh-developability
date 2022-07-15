@@ -15,23 +15,29 @@ Eigen::Matrix3d faceNormalGrad(size_t f,
                                const Eigen::Ref<const Matrix3Xd>& N,
                                const Eigen::Ref<const ArrayXd>& A);
 
-template <typename DerivedG>
-extern void regionNormalDeviationGrad(StarPartitioning& region,
-                                      const Eigen::Ref<const Matrix3Xd>& V,
-                                      const Eigen::Ref<const Matrix3Xi>& F,
-                                      const Eigen::Ref<const Matrix3Xd>& N,
-                                      const Eigen::Ref<const ArrayXd>& A,
-                                      const Eigen::Ref<const MatrixXi>& S,
-                                      Eigen::MatrixBase<DerivedG> const& G_);
+void regionNormalDeviationGrad(StarPartitioning& region,
+                               const Eigen::Ref<const Matrix3Xd>& V,
+                               const Eigen::Ref<const Matrix3Xi>& F,
+                               const Eigen::Ref<const Matrix3Xd>& N,
+                               const Eigen::Ref<const ArrayXd>& A,
+                               const Eigen::Ref<const MatrixXi>& S,
+                               Eigen::Ref<Matrix3Xd> G);
 
-template <typename DerivedG>
-extern void combinatorialEnergyGrad(const Eigen::Ref<const Matrix3Xd>& V,
-                                    const Eigen::Ref<const Matrix3Xi>& F,
-                                    const Eigen::Ref<const Matrix3Xd>& N,
-                                    const Eigen::Ref<const ArrayXd>& A,
-                                    const Eigen::Ref<const MatrixXi>& S,
-                                    const Eigen::Ref<const ArrayXb>& B,
-                                    Eigen::MatrixBase<DerivedG> const& G_,
-                                    std::function<void(double, size_t)> localEnergyCallback);
+void combinatorialEnergyGrad(const Eigen::Ref<const Matrix3Xd>& V,
+                             const Eigen::Ref<const Matrix3Xi>& F,
+                             const Eigen::Ref<const Matrix3Xd>& N,
+                             const Eigen::Ref<const ArrayXd>& A,
+                             const Eigen::Ref<const MatrixXi>& S,
+                             const Eigen::Ref<const ArrayXb>& B,
+                             Eigen::Ref<Matrix3Xd> G,
+                             std::function<void(double, size_t)> localEnergyCallback);
+
+void combinatorialEnergyGrad(const Eigen::Ref<const Matrix3Xd>& V,
+                             const Eigen::Ref<const Matrix3Xi>& F,
+                             const Eigen::Ref<const Matrix3Xd>& N,
+                             const Eigen::Ref<const ArrayXd>& A,
+                             const Eigen::Ref<const MatrixXi>& S,
+                             const Eigen::Ref<const ArrayXb>& B,
+                             Eigen::Ref<Matrix3Xd> G);
 
 #endif

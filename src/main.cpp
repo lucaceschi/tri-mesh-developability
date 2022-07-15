@@ -46,12 +46,12 @@ int main(int argc, char* argv[])
 
     // >> Mesh 2 matrices convertion <<
 
-    Matrix3Xd V;
-    Matrix3Xi F;
-    Matrix3Xd N;
-    ArrayXd A;
+    Matrix3Xd V(m.VN(), 3);
+    Matrix3Xi F(m.FN(), 3);
+    Matrix3Xd N(m.FN(), 3);
+    ArrayXd A(m.FN());
     MatrixXi S;
-    ArrayXb B;
+    ArrayXb B(m.VN());
 
     getMeshVF(m, V, F);
     getMeshStars(m, S);

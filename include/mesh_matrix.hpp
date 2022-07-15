@@ -11,23 +11,20 @@ using ArrayXd   = Eigen::ArrayXd;
 using ArrayXb   = Eigen::Array<bool, Eigen::Dynamic, 1, Eigen::ColMajor>;
 
 
-template <typename DerivedV, typename DerivedF>
-extern void getMeshVF(const MyMesh& mesh,
-                      Eigen::MatrixBase<DerivedV> const& V_,
-                      Eigen::MatrixBase<DerivedF> const& F_);
+void getMeshVF(const MyMesh& mesh,
+               Eigen::Ref<Matrix3Xd> V,
+               Eigen::Ref<Matrix3Xi> F);
 
 template <typename DerivedS>
 extern void getMeshStars(MyMesh& mesh,
                          Eigen::MatrixBase<DerivedS> const& S_);
 
-template <typename DerivedB>
-extern void getMeshBorders(MyMesh& mesh,
-                           Eigen::ArrayBase<DerivedB> const& B_);
+void getMeshBorders(MyMesh& mesh,
+                    Eigen::Ref<ArrayXb> B);
 
-template <typename DerivedN, typename DerivedA>
-extern void computeNormals(const Eigen::Ref<const Matrix3Xd>& V,
-                           const Eigen::Ref<const Matrix3Xi>& F,
-                           Eigen::MatrixBase<DerivedN> const& N_,
-                           Eigen::ArrayBase<DerivedA> const& A_);
+void computeNormals(const Eigen::Ref<const Matrix3Xd>& V,
+                    const Eigen::Ref<const Matrix3Xi>& F,
+                    Eigen::Ref<Matrix3Xd> N,
+                    Eigen::Ref<ArrayXd> A);
 
 #endif
