@@ -65,12 +65,12 @@ bool MeshPostProcessing<MeshType>::process(MeshType& m)
                 }
             }
 
-        if(edgeToFlip >= 0 && vcg::face::CheckFlipEdge(*fIter, edgeToFlip))
+        if(doEdgeFlipping && edgeToFlip >= 0 && vcg::face::CheckFlipEdge(*fIter, edgeToFlip))
         {
             vcg::face::FlipEdge<FaceType>(*fIter, edgeToFlip);
             meshModified = true;
         }
-        else if(edgeToCollapse >= 0 && vcg::face::FFLinkCondition(*fIter, edgeToCollapse))
+        else if(doEdgeCollapsing && edgeToCollapse >= 0 && vcg::face::FFLinkCondition(*fIter, edgeToCollapse))
         {
             vcg::face::FFEdgeCollapse<MeshType>(m, *fIter, edgeToCollapse);
             meshModified = true;

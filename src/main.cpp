@@ -98,20 +98,31 @@ int main(int argc, char* argv[])
     clockStart = clock();
     while(opt->step(V, F, N, A, S, B))
     {
+        opt->printStats();
+        
         for(size_t v = 0; v < V.rows(); v++)
             m.vert[v].P() = vcg::Point3d(V(v, 0), V(v, 1), V(v, 2));
         
         if(postProcessing.process(m))
         {
             std::cout << "Mesh topology has been altered" << std::endl;
+
+            V.resize(m.VN(), 3);
+            F.resize(m.FN(), 3);
+            N.resize(m.FN(), 3);
+            A.resize(m.FN());
+            B.resize(m.VN());
+
             getMeshVF(m, V, F);
             getMeshStars(m, S);
             getMeshBorders(m, B);
+
+            opt->updateNVertices(V.rows());
         }
         
         dt = ((double)(clock() - clockStart) / CLOCKS_PER_SEC);
         dts.push_back(dt);
-        opt->printStats();
+        
         clockStart = clock();
     }
 

@@ -81,7 +81,7 @@ bool BacktrackingOpt::step(Eigen::Ref<Matrix3Xd> V,
                            const Eigen::Ref<const MatrixXi>& S,
                            const Eigen::Ref<const ArrayXb>& B)
 {    
-    if(nFunEval >= maxFunEval || (nFunEval > 0 && gradNorm <= eps))
+    if(nFunEval >= maxFunEval || (gradNorm >= 0 && gradNorm <= eps))
         return false;
 
     if(gradNorm == -1)
@@ -130,6 +130,12 @@ bool BacktrackingOpt::step(Eigen::Ref<Matrix3Xd> V,
     return true;
 }
 
+void BacktrackingOpt::updateNVertices(int newNVertices)
+{
+    Optimizer::updateNVertices(newNVertices);
+    tmpV.resize(newNVertices, 3);
+}
+
 void BacktrackingOpt::printStats()
 {
     std::cout << "[BacktrackingOpt] nFunEval=" << getNFunEval()
@@ -165,7 +171,7 @@ bool LewisOvertonOpt::step(Eigen::Ref<Matrix3Xd> V,
                            const Eigen::Ref<const MatrixXi>& S,
                            const Eigen::Ref<const ArrayXb>& B)
 {
-    if(nFunEval >= maxFunEval || (nFunEval > 0 && gradNorm <= eps))
+    if(nFunEval >= maxFunEval || (gradNorm >= 0 && gradNorm <= eps))
         return false;
 
     if(gradNorm == -1)
@@ -204,7 +210,7 @@ bool LewisOvertonOpt::step(Eigen::Ref<Matrix3Xd> V,
         {
             tmpTomographyDeriv = -(G.array() * tmpG.array()).sum(); // == dot prod between tmpG and search dir -G
             // check if strong Wolfe condition fails
-            if(tmpTomographyDeriv < wolfeM3 * currTomographyDeriv)
+            if(abs(tmpTomographyDeriv) > wolfeM3 * abs(currTomographyDeriv))
                 stepSizeLowerBound = stepSize;
             else
                 break;
@@ -232,6 +238,13 @@ bool LewisOvertonOpt::step(Eigen::Ref<Matrix3Xd> V,
     gradNorm = G.norm();
 
     return true;
+}
+
+void LewisOvertonOpt::updateNVertices(int newNVertices)
+{
+    Optimizer::updateNVertices(newNVertices);
+    tmpV.resize(newNVertices, 3);
+    tmpG.resize(newNVertices, 3);
 }
 
 void LewisOvertonOpt::printStats()

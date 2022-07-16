@@ -22,6 +22,12 @@ public:
                       const Eigen::Ref<const MatrixXi>& S,
                       const Eigen::Ref<const ArrayXb>& B) = 0;
 
+    virtual void updateNVertices(int newNVertices)
+    {
+        G.resize(newNVertices, 3);
+        gradNorm = -1;
+        currEnergy = -1;
+    }
     virtual void printStats() = 0;
 
     double getGradientNorm() { return gradNorm; }
@@ -80,6 +86,7 @@ public:
             const Eigen::Ref<const MatrixXi>& S,
             const Eigen::Ref<const ArrayXb>& B) override;
 
+    void updateNVertices(int newNVertices) override;
     void printStats() override;
 
 private:
@@ -112,6 +119,7 @@ public:
             const Eigen::Ref<const MatrixXi>& S,
             const Eigen::Ref<const ArrayXb>& B) override;
 
+    void updateNVertices(int newNVertices) override;
     void printStats() override;
 
 private:
