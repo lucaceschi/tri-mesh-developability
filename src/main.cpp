@@ -16,8 +16,11 @@ using TriMask = vcg::tri::io::Mask;
 #include "energy.hpp"
 #include "energy_grad.hpp"
 #include "opt.hpp"
+#include "remeshing.hpp"
 
 #include <time.h>
+
+#define POSTPROCESSING_ANGLE_THRESHOLD 0.3
 
 
 // -------------------------------------------------------------------------------------------------
@@ -61,12 +64,13 @@ int main(int argc, char* argv[])
 
     // >> Optimization <<
 
+    Optimizer* opt;
+    MeshPostProcessing<MyMesh> postProcessing(true, true, POSTPROCESSING_ANGLE_THRESHOLD);
+
     // profiling
     double dt;
     std::vector<double> dts;
     clock_t clockStart;
-
-    Optimizer* opt;
 
     if(argv[2][0] == 'f')
     {
@@ -94,6 +98,17 @@ int main(int argc, char* argv[])
     clockStart = clock();
     while(opt->step(V, F, N, A, S, B))
     {
+        for(size_t v = 0; v < V.rows(); v++)
+            m.vert[v].P() = vcg::Point3d(V(v, 0), V(v, 1), V(v, 2));
+        
+        if(postProcessing.process(m))
+        {
+            std::cout << "Mesh topology has been altered" << std::endl;
+            getMeshVF(m, V, F);
+            getMeshStars(m, S);
+            getMeshBorders(m, B);
+        }
+        
         dt = ((double)(clock() - clockStart) / CLOCKS_PER_SEC);
         dts.push_back(dt);
         opt->printStats();
