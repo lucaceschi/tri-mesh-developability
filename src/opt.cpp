@@ -21,7 +21,7 @@ bool FixedStepOpt::step(Eigen::Ref<Matrix3Xd> V,
                         const Eigen::Ref<const MatrixXi>& S,
                         const Eigen::Ref<const ArrayXb>& B)
 {
-    if(nFunEval >= maxFunEval || (nFunEval > 0 && gradNorm <= eps))
+    if(nFunEval >= maxFunEval || (gradNorm >= 0 && gradNorm <= eps))
         return false;
     
     computeNormals(V, F, N, A);
@@ -37,12 +37,6 @@ bool FixedStepOpt::step(Eigen::Ref<Matrix3Xd> V,
     gradNorm = G.norm();
 
     V -= (G * stepSize);
-
-    std::cout << "[FixedStepOpt] nFunEval=" << getNFunEval()
-        << std::setw(20) << "stepSize=" << getCurrStepSize()
-        << std::setw(20) << "gradNorm=" << getGradientNorm()
-        << std::setw(20) << "energy=" << getCurrEnergy()
-        << std::endl;
 
     return true;
 }
