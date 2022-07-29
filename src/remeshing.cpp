@@ -45,7 +45,8 @@ bool MeshPostProcessing<MeshType>::process(MeshType& m)
 
         edgeToFlip = -1;
         edgeToCollapse = -1;
-        for(int i = 0; i < 2; i++)
+
+        for(int i = 0; i < 3; i++)
             if(faceAngles[i] < angleThreshold)
             {
                 if(faceAngles[(i+1)%3] < angleThreshold)
@@ -53,12 +54,7 @@ bool MeshPostProcessing<MeshType>::process(MeshType& m)
                     edgeToFlip = i;
                     break;
                 }
-                else if(faceAngles[(i-1)%3] < angleThreshold)
-                {
-                    edgeToFlip = (i-1)%3;
-                    break;
-                }
-                else
+                else if(faceAngles[(i+2)%3] >= angleThreshold)
                 {
                     edgeToCollapse = (i+1)%3;
                     break;
@@ -82,7 +78,6 @@ bool MeshPostProcessing<MeshType>::process(MeshType& m)
         vcg::tri::Allocator<MeshType>::CompactFaceVector(m);
         vcg::tri::Allocator<MeshType>::CompactVertexVector(m);
         vcg::tri::UpdateTopology<MeshType>::VertexFace(m);
-        vcg::tri::UpdateTopology<MeshType>::FaceFace(m);
         vcg::tri::UpdateFlags<MeshType>::VertexBorderFromFaceAdj(m);
     }
 

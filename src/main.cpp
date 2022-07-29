@@ -49,6 +49,10 @@ int main(int argc, char* argv[])
     vcg::tri::RequirePerVertexFlags<MyMesh>(m);
     vcg::tri::UpdateFlags<MyMesh>::VertexBorderFromFaceAdj(m);
 
+    MeshPostProcessing<MyMesh> postProcessing(true, true, POSTPROCESSING_ANGLE_THRESHOLD);
+    if(postProcessing.process(m))
+        std::cout << "Applied initial remeshing" << std::endl;
+
     // >> Mesh 2 matrices convertion <<
 
     Matrix3Xd V(m.VN(), 3);
@@ -65,7 +69,6 @@ int main(int argc, char* argv[])
     // >> Optimization <<
 
     Optimizer* opt;
-    MeshPostProcessing<MyMesh> postProcessing(true, true, POSTPROCESSING_ANGLE_THRESHOLD);
 
     // profiling
     double dt;
