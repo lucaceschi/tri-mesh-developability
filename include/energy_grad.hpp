@@ -5,39 +5,22 @@
 #include "energy.hpp"
 
 
-// -------------------------------------------------------------------------------------------------
-// Energy gradient on matrix representation
+vcg::Matrix33d faceNormalGrad(MyMesh::FacePointer f,
+                              int vIndex,
+                              MyMesh& m,
+                              AreaFaceAttrHandle& fAttrArea);
 
-Eigen::Matrix3d faceNormalGrad(size_t f,
-                               int FVindex,
-                               const Eigen::Ref<const Matrix3Xd>& V,
-                               const Eigen::Ref<const Matrix3Xi>& F,
-                               const Eigen::Ref<const Matrix3Xd>& N,
-                               const Eigen::Ref<const ArrayXd>& A);
+void regionNormalDeviationGrad(MyMesh::VertexPointer v,
+                               StarPartitioning& partitioning,
+                               bool region,
+                               MyMesh& m,
+                               AreaFaceAttrHandle& fAttrArea,
+                               StarVertAttrHandle& vAttrStar,
+                               GradientVertAttrHandle& vAttrGrad);
 
-void regionNormalDeviationGrad(StarPartitioning& region,
-                               const Eigen::Ref<const Matrix3Xd>& V,
-                               const Eigen::Ref<const Matrix3Xi>& F,
-                               const Eigen::Ref<const Matrix3Xd>& N,
-                               const Eigen::Ref<const ArrayXd>& A,
-                               const Eigen::Ref<const MatrixXi>& S,
-                               Eigen::Ref<Matrix3Xd> G);
-
-void combinatorialEnergyGrad(const Eigen::Ref<const Matrix3Xd>& V,
-                             const Eigen::Ref<const Matrix3Xi>& F,
-                             const Eigen::Ref<const Matrix3Xd>& N,
-                             const Eigen::Ref<const ArrayXd>& A,
-                             const Eigen::Ref<const MatrixXi>& S,
-                             const Eigen::Ref<const ArrayXb>& B,
-                             Eigen::Ref<Matrix3Xd> G,
-                             std::function<void(double, size_t)> localEnergyCallback);
-
-void combinatorialEnergyGrad(const Eigen::Ref<const Matrix3Xd>& V,
-                             const Eigen::Ref<const Matrix3Xi>& F,
-                             const Eigen::Ref<const Matrix3Xd>& N,
-                             const Eigen::Ref<const ArrayXd>& A,
-                             const Eigen::Ref<const MatrixXi>& S,
-                             const Eigen::Ref<const ArrayXb>& B,
-                             Eigen::Ref<Matrix3Xd> G);
+double combinatorialEnergyGrad(MyMesh& m,
+                             AreaFaceAttrHandle& fAttrArea,
+                             StarVertAttrHandle& vAttrStar,
+                             GradientVertAttrHandle& vAttrGrad);
 
 #endif

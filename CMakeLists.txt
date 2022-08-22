@@ -9,13 +9,12 @@ set(SRC_DIR src)
 set(INCL_DIR include)
 set(SOURCES
 	${SRC_DIR}/main.cpp
-	${SRC_DIR}/mesh_matrix.cpp
+	${SRC_DIR}/mesh.cpp
 	${SRC_DIR}/energy.cpp
 	${SRC_DIR}/energy_grad.cpp
 	${SRC_DIR}/opt.cpp
 	${SRC_DIR}/remeshing.cpp
 	${INCL_DIR}/mesh.hpp
-	${INCL_DIR}/mesh_matrix.hpp
 	${INCL_DIR}/energy.hpp
 	${INCL_DIR}/energy_grad.hpp
 	${INCL_DIR}/opt.hpp

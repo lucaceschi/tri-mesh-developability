@@ -28,13 +28,12 @@ bool MeshPostProcessing<MeshType>::process(MeshType& m)
     typedef typename MeshType::FaceType FaceType;
     typedef typename MeshType::FaceIterator FaceIterator;
     
-    FaceIterator fIter;
     double faceAngles[3];
     int edgeToFlip;
     int edgeToCollapse;
     bool meshModified = false;
     
-    for(fIter = m.face.begin(); fIter != m.face.end(); fIter++)
+    for(FaceIterator fIter = m.face.begin(); fIter != m.face.end(); fIter++)
     {
         if(fIter->IsD())
             continue;
@@ -45,8 +44,7 @@ bool MeshPostProcessing<MeshType>::process(MeshType& m)
 
         edgeToFlip = -1;
         edgeToCollapse = -1;
-
-        for(int i = 0; i < 3; i++)
+        for(int i = 0; i < 2; i++)
             if(faceAngles[i] < angleThreshold)
             {
                 if(faceAngles[(i+1)%3] < angleThreshold)
@@ -54,7 +52,12 @@ bool MeshPostProcessing<MeshType>::process(MeshType& m)
                     edgeToFlip = i;
                     break;
                 }
-                else if(faceAngles[(i+2)%3] >= angleThreshold)
+                else if(faceAngles[(i-1)%3] < angleThreshold)
+                {
+                    edgeToFlip = (i-1)%3;
+                    break;
+                }
+                else
                 {
                     edgeToCollapse = (i+1)%3;
                     break;
@@ -77,7 +80,6 @@ bool MeshPostProcessing<MeshType>::process(MeshType& m)
     {
         vcg::tri::Allocator<MeshType>::CompactFaceVector(m);
         vcg::tri::Allocator<MeshType>::CompactVertexVector(m);
-        vcg::tri::UpdateTopology<MeshType>::VertexFace(m);
         vcg::tri::UpdateFlags<MeshType>::VertexBorderFromFaceAdj(m);
     }
 

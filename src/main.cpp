@@ -1,8 +1,6 @@
 #include <iostream>
 #include <iomanip>
 
-#include <vcg/complex/algorithms/mesh_to_matrix.h>
-
 #include <wrap/io_trimesh/io_mask.h>
 #include <wrap/io_trimesh/import_obj.h>
 #include <wrap/io_trimesh/export_obj.h>
@@ -12,15 +10,13 @@ template<class M> using ExporterPLY = vcg::tri::io::ExporterPLY<M>;
 using TriMask = vcg::tri::io::Mask;
 
 #include "mesh.hpp"
-#include "mesh_matrix.hpp"
 #include "energy.hpp"
 #include "energy_grad.hpp"
 #include "opt.hpp"
 #include "remeshing.hpp"
+#define POSTPROCESSING_ANGLE_THRESHOLD 0.3
 
 #include <time.h>
-
-#define POSTPROCESSING_ANGLE_THRESHOLD 0.3
 
 
 // -------------------------------------------------------------------------------------------------
@@ -42,29 +38,12 @@ int main(int argc, char* argv[])
     
     // >> Mesh preprocessing <<
 
-    vcg::tri::RequireVFAdjacency(m);
-    vcg::tri::UpdateTopology<MyMesh>::VertexFace(m);
-    vcg::tri::RequireFFAdjacency(m);
     vcg::tri::UpdateTopology<MyMesh>::FaceFace(m);
-    vcg::tri::RequirePerVertexFlags<MyMesh>(m);
     vcg::tri::UpdateFlags<MyMesh>::VertexBorderFromFaceAdj(m);
 
     MeshPostProcessing<MyMesh> postProcessing(true, true, POSTPROCESSING_ANGLE_THRESHOLD);
     if(postProcessing.process(m))
         std::cout << "Applied initial remeshing" << std::endl;
-
-    // >> Mesh 2 matrices convertion <<
-
-    Matrix3Xd V(m.VN(), 3);
-    Matrix3Xi F(m.FN(), 3);
-    Matrix3Xd N(m.FN(), 3);
-    ArrayXd A(m.FN());
-    MatrixXi S;
-    ArrayXb B(m.VN());
-
-    getMeshVF(m, V, F);
-    getMeshStars(m, S);
-    getMeshBorders(m, B);
 
     // >> Optimization <<
 
@@ -81,46 +60,32 @@ int main(int argc, char* argv[])
         double eps = atof(argv[4]);
         double stepSize = atof(argv[5]);
 
-        opt = new FixedStepOpt(V.rows(), maxFunEval, eps, stepSize);
+        opt = new FixedStepOpt(m, maxFunEval, eps, stepSize);
     }
     else if(argv[2][0] == 'b')
     {
         int maxFunEval = atoi(argv[3]);
         double eps = atof(argv[4]);
         
-        opt = new BacktrackingOpt(V.rows(), maxFunEval, eps);
+        opt = new BacktrackingOpt(m, maxFunEval, eps);
     }
-    else
+    /*else
     {
         int maxFunEval = atoi(argv[3]);
         double eps = atof(argv[4]);
         
-        opt = new LewisOvertonOpt(V.rows(), maxFunEval, eps);
-    }
+        opt = new LewisOvertonOpt(m, maxFunEval, eps);
+    }*/
 
     clockStart = clock();
-    while(opt->step(V, F, N, A, S, B))
+    while(opt->step())
     {
         opt->printStats();
-        
-        for(size_t v = 0; v < V.rows(); v++)
-            m.vert[v].P() = vcg::Point3d(V(v, 0), V(v, 1), V(v, 2));
-        
+                
         if(postProcessing.process(m))
         {
             std::cout << "Mesh topology has been altered" << std::endl;
-
-            V.resize(m.VN(), 3);
-            F.resize(m.FN(), 3);
-            N.resize(m.FN(), 3);
-            A.resize(m.FN());
-            B.resize(m.VN());
-
-            getMeshVF(m, V, F);
-            getMeshStars(m, S);
-            getMeshBorders(m, B);
-
-            opt->updateNVertices(V.rows());
+            opt->reset();
         }
         
         dt = ((double)(clock() - clockStart) / CLOCKS_PER_SEC);
@@ -137,9 +102,6 @@ int main(int argc, char* argv[])
         dt += currDt;
     dt /= dts.size();
     std::cout << "Mean dt: " << dt << std::endl;
-
-    for(size_t v = 0; v < V.rows(); v++)
-        m.vert[v].P() = vcg::Point3d(V(v, 0), V(v, 1), V(v, 2));
 
     vcg::tri::io::ExporterPLY<MyMesh>::Save(m, "out.ply", TriMask::IOM_NONE, false);
 

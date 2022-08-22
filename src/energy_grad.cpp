@@ -1,97 +1,83 @@
 #include "energy_grad.hpp"
 
-#include "mesh_matrix.hpp"
 
+vcg::Matrix33d faceNormalGrad(MyMesh::FacePointer f,
+                               int vIndex,
+                               AreaFaceAttrHandle& fAttrArea)
+{    
+    vcg::Point3d oppositeEdge = f->V2(vIndex)->P() - f->V1(vIndex)->P();
+    vcg::Matrix33d grad;
 
-Eigen::Matrix3d faceNormalGrad(size_t f,
-                               int FVindex,
-                               const Eigen::Ref<const Matrix3Xd>& V,
-                               const Eigen::Ref<const Matrix3Xi>& F,
-                               const Eigen::Ref<const Matrix3Xd>& N,
-                               const Eigen::Ref<const ArrayXd>& A)
-{
-    Eigen::Vector3d oppositeEdge = V.row(F(f, (FVindex+2)%3)) - V.row(F(f, (FVindex+1)%3));
-    Eigen::Vector3d normal = N.row(f);
-    Eigen::Matrix3d grad = (oppositeEdge.cross(normal) * normal.transpose());
+    grad.ExternalProduct(oppositeEdge ^ f->N(), f->N());
+    grad /= fAttrArea[f];
 
-    return grad / A(f);
+    return grad;
 }
 
 
-void regionNormalDeviationGrad(StarPartitioning& region,
-                               const Eigen::Ref<const Matrix3Xd>& V,
-                               const Eigen::Ref<const Matrix3Xi>& F,
-                               const Eigen::Ref<const Matrix3Xd>& N,
-                               const Eigen::Ref<const ArrayXd>& A,
-                               const Eigen::Ref<const MatrixXi>& S,
-                               Eigen::Ref<Matrix3Xd> G)
+void regionNormalDeviationGrad(MyMesh::VertexPointer v,
+                               StarPartitioning& partitioning,
+                               bool region,
+                               MyMesh& m,
+                               AreaFaceAttrHandle& fAttrArea,
+                               StarVertAttrHandle& vAttrStar,
+                               GradientVertAttrHandle& vAttrGrad)
 {  
-    size_t faceA, faceB;
-    Eigen::Vector3d normalDiff;
-
-    int faceA_FVindex, faceB_FVindex;
-    size_t vertA, vertB;
-    bool sharedV;
+    int rBegin = region ? (partitioning.rBegin + partitioning.rSize)       : partitioning.rBegin;
+    int rSize  = region ? (partitioning.star->size() - partitioning.rSize) : partitioning.rSize;
+    int starSize = partitioning.star->size();
     
-    for(int i = region.rBegin; i < (region.rBegin + region.rSize - 1); i++)
-        for(int j = i+1; j < (region.rBegin + region.rSize); j++)
+    MyMesh::FacePointer faceA, faceB;
+    vcg::Point3d normalDiff;
+
+    int faceA_vIndex, faceB_vIndex;
+    MyMesh::VertexPointer vertA, vertB;
+    
+    for(int i = rBegin; i < (rBegin + rSize - 1); i++)
+        for(int j = i+1; j < (rBegin + rSize); j++)
         {
-            faceA = S(region.v, i % region.starSize);
-            faceB = S(region.v, j % region.starSize);
+            faceA = vAttrStar[v][i % starSize];
+            faceB = vAttrStar[v][j % starSize];
 
-            normalDiff = N.row(faceA) - N.row(faceB);
+            normalDiff = faceA->N() - faceB->N();
 
-            for(faceA_FVindex = 0; faceA_FVindex < 3; faceA_FVindex++)
+            for(faceA_vIndex = 0; faceA_vIndex < 3; faceA_vIndex++)
             {
-                vertA = F(faceA, faceA_FVindex);
-                G.row(vertA) += (normalDiff.transpose() * faceNormalGrad(faceA, faceA_FVindex, V, F, N, A) * 2/std::pow(region.rSize, 2));
+                vertA = faceA->V(faceA_vIndex);
+                vAttrGrad[vertA] += (faceNormalGrad(faceA, faceA_vIndex, fAttrArea).transpose() * normalDiff * 2/std::pow(rSize, 2));
             }
 
-            for(faceB_FVindex = 0; faceB_FVindex < 3; faceB_FVindex++)
+            for(faceB_vIndex = 0; faceB_vIndex < 3; faceB_vIndex++)
             {
-                vertB = F(faceB, faceB_FVindex);
-                G.row(vertB) -= (normalDiff.transpose() * faceNormalGrad(faceB, faceB_FVindex, V, F, N, A) * 2/std::pow(region.rSize, 2));
+                vertB = faceB->V(faceB_vIndex);
+                vAttrGrad[vertB] -= (faceNormalGrad(faceB, faceB_vIndex, fAttrArea).transpose() * normalDiff* 2/std::pow(rSize, 2));
             }            
         }
 }
 
 
-void combinatorialEnergyGrad(const Eigen::Ref<const Matrix3Xd>& V,
-                             const Eigen::Ref<const Matrix3Xi>& F,
-                             const Eigen::Ref<const Matrix3Xd>& N,
-                             const Eigen::Ref<const ArrayXd>& A,
-                             const Eigen::Ref<const MatrixXi>& S,
-                             const Eigen::Ref<const ArrayXb>& B,
-                             Eigen::Ref<Matrix3Xd> G,
-                             std::function<void(double, size_t)> localEnergyCallback)
+double combinatorialEnergyGrad(MyMesh& m,
+                               AreaFaceAttrHandle& fAttrArea,
+                               StarVertAttrHandle& vAttrStar,
+                               GradientVertAttrHandle& vAttrGrad)
 {
-    G.setZero();
+    for(MyMesh::VertexIterator vIter = m.vert.begin(); vIter != m.vert.end(); vIter++)
+        vAttrGrad[vIter].SetZero();
 
     double currEnergy;
+    double totEnergy = 0.0;
     StarPartitioning currPart;
-    for(size_t v = 0; v < V.rows(); v++)
+    for(MyMesh::VertexIterator vIter = m.vert.begin(); vIter != m.vert.end(); vIter++)
     {
-        currEnergy = localCombinatorialEnergy(v, N, S, B, &currPart);
-        localEnergyCallback(currEnergy, v);
+        currEnergy = localCombinatorialEnergy(&(*vIter), m, vAttrStar, &currPart);
+        totEnergy += currEnergy;
 
-        if(currPart.starSize <= 3 || B(v))
+        if(currPart.star->size() <= 3 || vIter->IsB())
             continue;
 
-        regionNormalDeviationGrad(currPart, V, F, N, A, S, G);
-        currPart.rBegin = (currPart.rBegin + currPart.rSize); // % currPart.starI.size();
-        currPart.rSize  = currPart.starSize - currPart.rSize;
-        regionNormalDeviationGrad(currPart, V, F, N, A, S, G);
+        regionNormalDeviationGrad(&(*vIter), currPart, 0, m, fAttrArea, vAttrStar, vAttrGrad);
+        regionNormalDeviationGrad(&(*vIter), currPart, 1, m, fAttrArea, vAttrStar, vAttrGrad);
     }
-}
 
-
-void combinatorialEnergyGrad(const Eigen::Ref<const Matrix3Xd>& V,
-                             const Eigen::Ref<const Matrix3Xi>& F,
-                             const Eigen::Ref<const Matrix3Xd>& N,
-                             const Eigen::Ref<const ArrayXd>& A,
-                             const Eigen::Ref<const MatrixXi>& S,
-                             const Eigen::Ref<const ArrayXb>& B,
-                             Eigen::Ref<Matrix3Xd> G)
-{
-    combinatorialEnergyGrad(V, F, N, A, S, B, G, [](double e, size_t v) {});
+    return totEnergy;
 }

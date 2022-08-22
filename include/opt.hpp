@@ -1,45 +1,34 @@
 #ifndef OPT_HPP
 #define OPT_HPP
 
-#include "mesh_matrix.hpp"
+#include "mesh.hpp"
 
 
 class Optimizer
 {
 public:
-    Optimizer(int nVertices, double stepSize) :
-        G(nVertices, 3),
+    Optimizer(MyMesh& m,
+              double stepSize) :
+        m(m),
         stepSize(stepSize),
-        gradNorm(-1),
-        currEnergy(-1),
         nFunEval(0)
     {}
 
-    virtual bool step(Eigen::Ref<Matrix3Xd> V,
-                      const Eigen::Ref<const Matrix3Xi>& F,
-                      Eigen::Ref<Matrix3Xd> N,
-                      Eigen::Ref<ArrayXd> A,
-                      const Eigen::Ref<const MatrixXi>& S,
-                      const Eigen::Ref<const ArrayXb>& B) = 0;
-
-    virtual void updateNVertices(int newNVertices)
-    {
-        G.resize(newNVertices, 3);
-        gradNorm = -1;
-        currEnergy = -1;
-    }
+    virtual void reset() = 0;
+    virtual bool step() = 0;
     virtual void printStats() = 0;
 
-    double getGradientNorm() { return gradNorm; }
-    double getCurrStepSize() { return stepSize; }
-    double getCurrEnergy() { return currEnergy; }
+    void updateGradientSqNorm(GradientVertAttrHandle vAttrGrad);
+    double getGradientSqNorm() { return gradSqNorm; }
+    double getStepSize() { return stepSize; }
+    double getEnergy() { return energy; }
     int getNFunEval() { return nFunEval; }
 
 protected:
-    Matrix3Xd G;
+    MyMesh& m;
     double stepSize;
-    double gradNorm;
-    double currEnergy;
+    double gradSqNorm;
+    double energy;
     int nFunEval;
 };
 
@@ -48,78 +37,68 @@ protected:
 class FixedStepOpt : public Optimizer
 {
 public:
-    FixedStepOpt(int nVertices,
+    FixedStepOpt(MyMesh& m,
                  int maxFunEval,
                  double eps,
                  double stepSize);
 
-    bool step(Eigen::Ref<Matrix3Xd> V,
-              const Eigen::Ref<const Matrix3Xi>& F,
-              Eigen::Ref<Matrix3Xd> N,
-              Eigen::Ref<ArrayXd> A,
-              const Eigen::Ref<const MatrixXi>& S,
-              const Eigen::Ref<const ArrayXb>& B) override;
-
+    void reset() override;
+    bool step() override;
     void printStats() override;
 
 private:
+    AreaFaceAttrHandle fAttrArea;
+    StarVertAttrHandle vAttrStar;
+    GradientVertAttrHandle vAttrGrad;
     int maxFunEval;
     double eps;
 };
+
 
 // Gradient method optimization with backtracking line search (Armijo condition)
 class BacktrackingOpt : public Optimizer
 {
 public:
-    BacktrackingOpt(int nVertices,
+    BacktrackingOpt(MyMesh& m,
                     int maxFunEval,
                     double eps,
-                    double initialStepSize = 1.0,
-                    double minStepSize = 1e-16,
-                    double tau = 0.9,
-                    double armijoM1 = 0.0001);
+                    double initialStepSize = 0.8,
+                    double minStepSize = 1e-10,
+                    double tau = 0.8,
+                    double armijoM1 = 1e-4);
 
-    bool step(Eigen::Ref<Matrix3Xd> V,
-            const Eigen::Ref<const Matrix3Xi>& F,
-            Eigen::Ref<Matrix3Xd> N,
-            Eigen::Ref<ArrayXd> A,
-            const Eigen::Ref<const MatrixXi>& S,
-            const Eigen::Ref<const ArrayXb>& B) override;
-
-    void updateNVertices(int newNVertices) override;
+    void reset() override;
+    bool step() override;
     void printStats() override;
 
 private:
+    MyMesh tmpMesh;
+    AreaFaceAttrHandle fAttrArea;
+    StarVertAttrHandle vAttrStar;
+    GradientVertAttrHandle vAttrGrad;
     int maxFunEval;
     double eps;
     double initialStepSize;
     double minStepSize;
     double tau;
     double armijoM1;
-
-    Matrix3Xd tmpV;
 };
 
+
 // Gradient method optimization with Lewis and Overton line search (Armijo + strong Wolfe conditions)
-class LewisOvertonOpt : public Optimizer
+/*class LewisOvertonOpt : public Optimizer
 {
 public:
-    LewisOvertonOpt(int nVertices,
+    LewisOvertonOpt(MyMesh& m,
                     int maxFunEval,
                     double eps,
-                    double initialStepSize = 1.0,
-                    double minStepSize = 1e-12,
+                    double initialStepSize = 0.8,
+                    double minStepSize = 1e-10,
                     double armijoM1 = 0.0001,
                     double wolfeM3 = 0.99);
 
-    bool step(Eigen::Ref<Matrix3Xd> V,
-            const Eigen::Ref<const Matrix3Xi>& F,
-            Eigen::Ref<Matrix3Xd> N,
-            Eigen::Ref<ArrayXd> A,
-            const Eigen::Ref<const MatrixXi>& S,
-            const Eigen::Ref<const ArrayXb>& B) override;
-
-    void updateNVertices(int newNVertices) override;
+    void reset() override;
+    bool step() override;
     void printStats() override;
 
 private:
@@ -129,10 +108,9 @@ private:
     double minStepSize;
     double armijoM1;
     double wolfeM3;
-
-    Matrix3Xd tmpV;
-    Matrix3Xd tmpG;
-};
+    MyMesh tmpMesh;
+    GradientVertAttrHandle tmpvAttrGrad;
+};*/
 
 
 #endif
