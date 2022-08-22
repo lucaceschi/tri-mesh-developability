@@ -75,11 +75,15 @@ double regionNormalDeviation(const Eigen::Ref<const Matrix3Xd>& N,
                              int rBegin,
                              int rSize)
 {
-    Eigen::Vector3d n = Eigen::Vector3d::Zero(3);
+    Eigen::Vector3d normDiff;
+    double regionNormalDev = 0.0;
 
     for(int i = rBegin; i < (rBegin + rSize - 1); i++)
         for(int j = i+1; j < (rBegin + rSize); j++)
-            n += ( N.row(S(v, i % starSize)) - N.row(S(v, j % starSize)) );
+        {
+            normDiff = ( N.row(S(v, i % starSize)) - N.row(S(v, j % starSize)) );
+            regionNormalDev += (normDiff.squaredNorm() / std::pow(rSize, 2));
+        }
 
-    return n.squaredNorm() / std::pow(rSize, 2);
+    return regionNormalDev;
 }
