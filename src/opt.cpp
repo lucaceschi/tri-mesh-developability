@@ -4,7 +4,18 @@
 #include <iostream>
 #include <iomanip>
 
-void Optimizer::updateGradientSqNorm(GradientVertAttrHandle vAttrGrad)
+
+Optimizer::Optimizer(MyMesh& m, double stepSize) :
+    m(m),
+    stepSize(stepSize),
+    nFunEval(0)
+{
+    vAttrStar = vcg::tri::Allocator<MyMesh>::GetPerVertexAttribute<Star>(m, std::string("Star"));
+    vAttrGrad = vcg::tri::Allocator<MyMesh>::GetPerVertexAttribute<vcg::Point3d>(m, std::string("Gradient"));
+    fAttrArea = vcg::tri::Allocator<MyMesh>::GetPerFaceAttribute<double>(m, std::string("Area"));
+}
+
+void Optimizer::updateGradientSqNorm()
 {
     gradSqNorm = 0.0;
     
@@ -22,9 +33,6 @@ FixedStepOpt::FixedStepOpt(MyMesh& m,
     maxFunEval(maxFunEval),
     eps(eps)
 {
-    vAttrStar = vcg::tri::Allocator<MyMesh>::GetPerVertexAttribute<Star>(m, std::string("Star"));
-    vAttrGrad = vcg::tri::Allocator<MyMesh>::GetPerVertexAttribute<vcg::Point3d>(m, std::string("Gradient"));
-    fAttrArea = vcg::tri::Allocator<MyMesh>::GetPerFaceAttribute<double>(m, std::string("Area"));
     reset();
 }
 
@@ -33,7 +41,7 @@ void FixedStepOpt::reset()
     updateFaceStars(m, vAttrStar);
     updateNormalsAndAreas(m, fAttrArea);
     energy = combinatorialEnergyGrad(m, fAttrArea, vAttrStar, vAttrGrad);
-    updateGradientSqNorm(vAttrGrad);
+    updateGradientSqNorm();
 }
 
 bool FixedStepOpt::step()
@@ -46,7 +54,7 @@ bool FixedStepOpt::step()
 
     updateNormalsAndAreas(m, fAttrArea);
     energy = combinatorialEnergyGrad(m, fAttrArea, vAttrStar, vAttrGrad);
-    updateGradientSqNorm(vAttrGrad);
+    updateGradientSqNorm();
     nFunEval++;
 
     return true;
@@ -77,19 +85,20 @@ BacktrackingOpt::BacktrackingOpt(MyMesh& m,
     tau(tau),
     armijoM1(armijoM1)
 {
-    vAttrStar = vcg::tri::Allocator<MyMesh>::GetPerVertexAttribute<Star>(tmpMesh, std::string("Star"));
-    vAttrGrad = vcg::tri::Allocator<MyMesh>::GetPerVertexAttribute<vcg::Point3d>(tmpMesh, std::string("Gradient"));
-    fAttrArea = vcg::tri::Allocator<MyMesh>::GetPerFaceAttribute<double>(tmpMesh, std::string("Area"));
     reset();
 }
 
 void BacktrackingOpt::reset()
 {
-    vcg::tri::Append<MyMesh, MyMesh>::MeshCopy(tmpMesh, m, false, true);
-    updateFaceStars(tmpMesh, vAttrStar);
-    updateNormalsAndAreas(tmpMesh, fAttrArea);
-    energy = combinatorialEnergyGrad(tmpMesh, fAttrArea, vAttrStar, vAttrGrad);
-    updateGradientSqNorm(vAttrGrad);
+    tmpVP.clear();
+    tmpVP.reserve(m.vert.size());
+    for(size_t v = 0; v < m.vert.size(); v++)
+        tmpVP.push_back(m.vert[v].cP());
+        
+    updateFaceStars(m, vAttrStar);
+    updateNormalsAndAreas(m, fAttrArea);
+    energy = combinatorialEnergyGrad(m, fAttrArea, vAttrStar, vAttrGrad);
+    updateGradientSqNorm();
 }
 
 bool BacktrackingOpt::step()
@@ -104,11 +113,11 @@ bool BacktrackingOpt::step()
 
     for(LS_stepSize = initialStepSize; LS_stepSize > minStepSize; LS_stepSize *= tau)
     {
-        for(size_t v = 0; v < m.VN(); v++)
-            tmpMesh.vert[v].P() = m.vert[v].cP() - vAttrGrad[v] * LS_stepSize;
+        for(size_t v = 0; v < m.vert.size(); v++)
+            m.vert[v].P() = tmpVP[v] - vAttrGrad[v] * LS_stepSize;
 
-        updateNormalsAndAreas(tmpMesh, fAttrArea);
-        LS_energy = combinatorialEnergy(tmpMesh, vAttrStar);
+        updateNormalsAndAreas(m, fAttrArea);
+        LS_energy = combinatorialEnergy(m, vAttrStar);
         nFunEval++;
 
         // check Armijo condition
@@ -116,16 +125,20 @@ bool BacktrackingOpt::step()
             break;
 
         if(nFunEval >= maxFunEval)
+        {
+            for(size_t v = 0; v < m.vert.size(); v++)
+                m.vert[v].P() = tmpVP[v];
             return false;
+        }
     }
 
-    for(size_t v = 0; v < m.VN(); v++)
-        m.vert[v].P() = tmpMesh.vert[v].cP();
+    for(size_t v = 0; v < m.vert.size(); v++)
+        tmpVP[v] = m.vert[v].cP();
 
     stepSize = LS_stepSize;
     energy = LS_energy;
-    combinatorialEnergyGrad(tmpMesh, fAttrArea, vAttrStar, vAttrGrad);
-    updateGradientSqNorm(vAttrGrad);
+    combinatorialEnergyGrad(m, fAttrArea, vAttrStar, vAttrGrad);
+    updateGradientSqNorm();
     nFunEval++;
 
     return true;

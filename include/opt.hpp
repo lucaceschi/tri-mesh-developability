@@ -7,18 +7,12 @@
 class Optimizer
 {
 public:
-    Optimizer(MyMesh& m,
-              double stepSize) :
-        m(m),
-        stepSize(stepSize),
-        nFunEval(0)
-    {}
-
+    Optimizer(MyMesh& m, double stepSize);
     virtual void reset() = 0;
     virtual bool step() = 0;
     virtual void printStats() = 0;
 
-    void updateGradientSqNorm(GradientVertAttrHandle vAttrGrad);
+    void updateGradientSqNorm();
     double getGradientSqNorm() { return gradSqNorm; }
     double getStepSize() { return stepSize; }
     double getEnergy() { return energy; }
@@ -26,6 +20,9 @@ public:
 
 protected:
     MyMesh& m;
+    AreaFaceAttrHandle fAttrArea;
+    StarVertAttrHandle vAttrStar;
+    GradientVertAttrHandle vAttrGrad;
     double stepSize;
     double gradSqNorm;
     double energy;
@@ -47,9 +44,6 @@ public:
     void printStats() override;
 
 private:
-    AreaFaceAttrHandle fAttrArea;
-    StarVertAttrHandle vAttrStar;
-    GradientVertAttrHandle vAttrGrad;
     int maxFunEval;
     double eps;
 };
@@ -72,10 +66,7 @@ public:
     void printStats() override;
 
 private:
-    MyMesh tmpMesh;
-    AreaFaceAttrHandle fAttrArea;
-    StarVertAttrHandle vAttrStar;
-    GradientVertAttrHandle vAttrGrad;
+    std::vector<vcg::Point3d> tmpVP;
     int maxFunEval;
     double eps;
     double initialStepSize;
