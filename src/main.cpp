@@ -16,6 +16,9 @@ using TriMask = vcg::tri::io::Mask;
 #include "remeshing.hpp"
 #define POSTPROCESSING_ANGLE_THRESHOLD 0.3
 
+#include <vcg/complex/algorithms/update/bounding.h>
+#include <vcg/complex/algorithms/update/position.h>
+
 #include <time.h>
 
 
@@ -27,6 +30,7 @@ int main(int argc, char* argv[])
     // >> Mesh loading <<
 
     MyMesh m;
+    double boundingBoxDiag;
 
     int loadMask;
     if(ImporterOBJ<MyMesh>::Open(m, argv[1], loadMask) != ImporterOBJ<MyMesh>::E_NOERROR)
@@ -44,6 +48,10 @@ int main(int argc, char* argv[])
     MeshPostProcessing<MyMesh> postProcessing(true, true, POSTPROCESSING_ANGLE_THRESHOLD);
     if(postProcessing.process(m))
         std::cout << "Applied initial remeshing" << std::endl;
+
+    vcg::tri::UpdateBounding<MyMesh>::Box(m);
+    boundingBoxDiag = m.bbox.Diag();
+    vcg::tri::UpdatePosition<MyMesh>::Scale(m, 1.0 / boundingBoxDiag);
 
     // >> Optimization <<
 
@@ -102,7 +110,8 @@ int main(int argc, char* argv[])
         dt += currDt;
     dt /= dts.size();
     std::cout << "Mean dt: " << dt << std::endl;
-
+    
+    vcg::tri::UpdatePosition<MyMesh>::Scale(m, boundingBoxDiag);
     vcg::tri::io::ExporterPLY<MyMesh>::Save(m, "out.ply", TriMask::IOM_NONE, false);
 
     return 0;
