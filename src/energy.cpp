@@ -1,5 +1,6 @@
 #include "energy.hpp"
 
+#define AVOID_BRANCHING
 
 double combinatorialEnergy(MyMesh& m,
                            StarVertAttrHandle& vAttrStar)
@@ -40,8 +41,14 @@ double localCombinatorialEnergy(MyMesh::VertexPointer v,
             for(currP.rBegin = 0; currP.rBegin < (currP.star->size() - currP.rSize); currP.rBegin++)
             {                
                 double currRegionEnergy  = regionNormalDeviation(currP, 0, m);
-                double otherRegionEnergy = regionNormalDeviation(currP, 1, m);                
-                double currPartitioningEnergy = currRegionEnergy + otherRegionEnergy;
+                double otherRegionEnergy = regionNormalDeviation(currP, 1, m);  
+
+                double currPartitioningEnergy;
+                #ifdef AVOID_BRANCHING
+                    currPartitioningEnergy = std::max(currRegionEnergy, otherRegionEnergy);
+                #else
+                    currPartitioningEnergy = currRegionEnergy + otherRegionEnergy;
+                #endif
 
                 if(energy < 0 || currPartitioningEnergy < energy)
                 {
@@ -71,13 +78,20 @@ double regionNormalDeviation(const StarPartitioning& partitioning,
     vcg::Point3d normDiff;
     normDiff.SetZero();
 
+    double currRegionNormalDev;
     double regionNormalDev = 0.0;
 
     for(int i = rBegin; i < (rBegin + rSize - 1); i++)
         for(int j = i+1; j < (rBegin + rSize); j++)
         {
             normDiff = ( partitioning.star->at(i % starSize)->N() - partitioning.star->at(j % starSize)->N() );
-            regionNormalDev += ( normDiff.SquaredNorm() / std::pow(rSize, 2) );
+            currRegionNormalDev = normDiff.SquaredNorm();
+
+            #ifdef AVOID_BRANCHING
+                regionNormalDev = std::max(regionNormalDev, currRegionNormalDev);
+            #else
+                regionNormalDev += ( currRegionNormalDev / std::pow(rSize, 2) );
+            #endif
         }
 
     return regionNormalDev;
