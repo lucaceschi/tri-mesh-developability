@@ -4,15 +4,28 @@
 #include "mesh.hpp"
 
 
+/*
+ * Gradient method optimizer interface
+ */
 class Optimizer
 {
 public:
     Optimizer(MyMesh& m, double stepSize);
+
+    /*
+     * Routine that must be called when the mesh geometry and/or topology changes
+     */
     virtual void reset() = 0;
+
+    /*
+     * Perform an optimization step; returns true iff another step can be performed
+     */
     virtual bool step() = 0;
+
     virtual void printStats() = 0;
 
     void updateGradientSqNorm();
+
     double getGradientSqNorm() { return gradSqNorm; }
     double getStepSize() { return stepSize; }
     double getEnergy() { return energy; }
@@ -23,6 +36,7 @@ protected:
     AreaFaceAttrHandle fAttrArea;
     StarVertAttrHandle vAttrStar;
     GradientVertAttrHandle vAttrGrad;
+    
     double stepSize;
     double gradSqNorm;
     double energy;
@@ -30,7 +44,9 @@ protected:
 };
 
 
-// Gradient method optimization with fixed step size
+/*
+ * Gradient method optimization with fixed step size
+ */
 class FixedStepOpt : public Optimizer
 {
 public:
@@ -49,16 +65,18 @@ private:
 };
 
 
-// Gradient method optimization with backtracking line search (Armijo condition)
+/*
+ * Gradient method optimization with backtracking line search (Armijo condition)
+ */
 class BacktrackingOpt : public Optimizer
 {
 public:
     BacktrackingOpt(MyMesh& m,
                     int maxFunEval,
                     double eps,
-                    double initialStepSize = 0.8,
+                    double initialStepSize,
+                    double tau,
                     double minStepSize = 1e-10,
-                    double tau = 0.8,
                     double armijoM1 = 1e-4);
 
     void reset() override;
@@ -74,34 +92,6 @@ private:
     double tau;
     double armijoM1;
 };
-
-
-// Gradient method optimization with Lewis and Overton line search (Armijo + strong Wolfe conditions)
-/*class LewisOvertonOpt : public Optimizer
-{
-public:
-    LewisOvertonOpt(MyMesh& m,
-                    int maxFunEval,
-                    double eps,
-                    double initialStepSize = 0.8,
-                    double minStepSize = 1e-10,
-                    double armijoM1 = 0.0001,
-                    double wolfeM3 = 0.99);
-
-    void reset() override;
-    bool step() override;
-    void printStats() override;
-
-private:
-    int maxFunEval;
-    double eps;
-    double initialStepSize;
-    double minStepSize;
-    double armijoM1;
-    double wolfeM3;
-    MyMesh tmpMesh;
-    GradientVertAttrHandle tmpvAttrGrad;
-};*/
 
 
 #endif
