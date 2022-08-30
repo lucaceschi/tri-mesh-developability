@@ -24,13 +24,8 @@ set(SOURCES
 
 add_subdirectory(${VCGLIB_DIR})
 
-add_executable(out ${SOURCES})
-target_include_directories(out PRIVATE ${INCL_DIR})
-target_link_libraries(out
+add_executable(develop ${SOURCES})
+target_include_directories(develop PRIVATE ${INCL_DIR})
+target_link_libraries(develop
 	PUBLIC vcglib
 )
-
-find_package(OpenMP)
-if(OpenMP_CXX_FOUND)
-    target_link_libraries(out PUBLIC OpenMP::OpenMP_CXX)
-endif()

@@ -1,8 +1,6 @@
 #include "remeshing.hpp"
 
-#include <vcg/simplex/face/topology.h>
 #include <vcg/complex/allocate.h>
-#include <vcg/complex/algorithms/update/topology.h>
 #include <vcg/complex/algorithms/update/flag.h>
 
 #include "mesh.hpp"
@@ -14,7 +12,7 @@ MeshPostProcessing<MeshType>::MeshPostProcessing(bool doEdgeFlipping,
                                                  double angleThreshold) :
     doEdgeFlipping(doEdgeFlipping),
     doEdgeCollapsing(doEdgeCollapsing),
-    angleThreshold(angleThreshold)
+    angleThreshold(angleThreshold) // the radiants under which the angle is considered to be small
 {}
 
 template MeshPostProcessing<MyMesh>::MeshPostProcessing(bool doEdgeFlipping,

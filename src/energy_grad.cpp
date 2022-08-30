@@ -1,17 +1,31 @@
 #include "energy_grad.hpp"
 
 
-vcg::Matrix33d faceNormalGrad(MyMesh::FacePointer f,
-                               int vIndex,
-                               AreaFaceAttrHandle& fAttrArea)
-{    
-    vcg::Point3d oppositeEdge = f->V2(vIndex)->P() - f->V1(vIndex)->P();
-    vcg::Matrix33d grad;
+double combinatorialEnergyGrad(MyMesh& m,
+                               AreaFaceAttrHandle& fAttrArea,
+                               StarVertAttrHandle& vAttrStar,
+                               GradientVertAttrHandle& vAttrGrad)
+{
+    // reset the gradient associated with each vertex
+    for(MyMesh::VertexIterator vIter = m.vert.begin(); vIter != m.vert.end(); vIter++)
+        vAttrGrad[vIter].SetZero();
 
-    grad.ExternalProduct(oppositeEdge ^ f->N(), f->N());
-    grad /= fAttrArea[f];
+    double currEnergy;
+    double totEnergy = 0.0;
+    StarPartitioning currPart;
+    for(MyMesh::VertexIterator vIter = m.vert.begin(); vIter != m.vert.end(); vIter++)
+    {
+        currEnergy = localCombinatorialEnergy(&(*vIter), m, vAttrStar, &currPart);
+        totEnergy += currEnergy;
 
-    return grad;
+        if(currPart.star->size() <= 3 || vIter->IsB())
+            continue;
+
+        regionNormalDeviationGrad(&(*vIter), currPart, 0, m, fAttrArea, vAttrStar, vAttrGrad);
+        regionNormalDeviationGrad(&(*vIter), currPart, 1, m, fAttrArea, vAttrStar, vAttrGrad);
+    }
+
+    return totEnergy;
 }
 
 
@@ -23,6 +37,7 @@ void regionNormalDeviationGrad(MyMesh::VertexPointer v,
                                StarVertAttrHandle& vAttrStar,
                                GradientVertAttrHandle& vAttrGrad)
 {  
+    // compute the begin index and the cardinality of the desired region
     int rBegin = region ? (partitioning.rBegin + partitioning.rSize)       : partitioning.rBegin;
     int rSize  = region ? (partitioning.star->size() - partitioning.rSize) : partitioning.rSize;
     int starSize = partitioning.star->size();
@@ -33,6 +48,7 @@ void regionNormalDeviationGrad(MyMesh::VertexPointer v,
     int faceA_vIndex, faceB_vIndex;
     MyMesh::VertexPointer vertA, vertB;
     
+    // iterate through each pair of faces within the region
     for(int i = rBegin; i < (rBegin + rSize - 1); i++)
         for(int j = i+1; j < (rBegin + rSize); j++)
         {
@@ -56,28 +72,15 @@ void regionNormalDeviationGrad(MyMesh::VertexPointer v,
 }
 
 
-double combinatorialEnergyGrad(MyMesh& m,
-                               AreaFaceAttrHandle& fAttrArea,
-                               StarVertAttrHandle& vAttrStar,
-                               GradientVertAttrHandle& vAttrGrad)
-{
-    for(MyMesh::VertexIterator vIter = m.vert.begin(); vIter != m.vert.end(); vIter++)
-        vAttrGrad[vIter].SetZero();
+vcg::Matrix33d faceNormalGrad(MyMesh::FacePointer f,
+                               int vIndex,
+                               AreaFaceAttrHandle& fAttrArea)
+{    
+    vcg::Point3d oppositeEdge = f->V2(vIndex)->P() - f->V1(vIndex)->P();
+    vcg::Matrix33d grad;
 
-    double currEnergy;
-    double totEnergy = 0.0;
-    StarPartitioning currPart;
-    for(MyMesh::VertexIterator vIter = m.vert.begin(); vIter != m.vert.end(); vIter++)
-    {
-        currEnergy = localCombinatorialEnergy(&(*vIter), m, vAttrStar, &currPart);
-        totEnergy += currEnergy;
+    grad.ExternalProduct(oppositeEdge ^ f->N(), f->N());
+    grad /= fAttrArea[f];
 
-        if(currPart.star->size() <= 3 || vIter->IsB())
-            continue;
-
-        regionNormalDeviationGrad(&(*vIter), currPart, 0, m, fAttrArea, vAttrStar, vAttrGrad);
-        regionNormalDeviationGrad(&(*vIter), currPart, 1, m, fAttrArea, vAttrStar, vAttrGrad);
-    }
-
-    return totEnergy;
+    return grad;
 }

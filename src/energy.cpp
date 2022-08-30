@@ -71,6 +71,7 @@ double regionNormalDeviation(const StarPartitioning& partitioning,
                              bool region,
                              MyMesh& m)
 {
+    // compute the begin index and the cardinality of the desired region
     int rBegin = region ? (partitioning.rBegin + partitioning.rSize)       : partitioning.rBegin;
     int rSize  = region ? (partitioning.star->size() - partitioning.rSize) : partitioning.rSize;
     int starSize = partitioning.star->size();
@@ -81,6 +82,7 @@ double regionNormalDeviation(const StarPartitioning& partitioning,
     double currRegionNormalDev;
     double regionNormalDev = 0.0;
 
+    // iterate through each pair of faces within the region
     for(int i = rBegin; i < (rBegin + rSize - 1); i++)
         for(int j = i+1; j < (rBegin + rSize); j++)
         {
