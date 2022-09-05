@@ -79,6 +79,7 @@ int main(int argc, char* argv[])
 
     MyMesh m;
     double boundingBoxDiag;
+    vcg::Point3d boundingBoxCenter;
 
     int loadMask;
     int err;
@@ -111,6 +112,8 @@ int main(int argc, char* argv[])
 
     vcg::tri::UpdateBounding<MyMesh>::Box(m);
     boundingBoxDiag = m.bbox.Diag();
+    boundingBoxCenter = m.bbox.Center();
+    vcg::tri::UpdatePosition<MyMesh>::Translate(m, -boundingBoxCenter);
     vcg::tri::UpdatePosition<MyMesh>::Scale(m, 1.0 / boundingBoxDiag);
 
     /*/ OPTIMIZATION /*/
@@ -154,6 +157,7 @@ int main(int argc, char* argv[])
     std::cout << "Mean delta time: " << dt << std::endl;
 
     vcg::tri::UpdatePosition<MyMesh>::Scale(m, boundingBoxDiag);
+    vcg::tri::UpdatePosition<MyMesh>::Translate(m, boundingBoxCenter);
     vcg::tri::io::ExporterPLY<MyMesh>::Save(m, "out.ply", TriMask::IOM_NONE, false);
 
     return 0;
