@@ -2,6 +2,7 @@
 
 #define AVOID_BRANCHING
 
+
 double combinatorialEnergy(MyMesh& m,
                            StarVertAttrHandle& vAttrStar)
 {

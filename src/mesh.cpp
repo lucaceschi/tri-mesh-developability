@@ -27,6 +27,7 @@ void updateFaceStars(MyMesh& m, StarVertAttrHandle& stars)
     }
 }
 
+
 void updateNormalsAndAreas(MyMesh& m, AreaFaceAttrHandle& areas)
 {
     vcg::tri::UpdateNormal<MyMesh>::PerFace(m);
